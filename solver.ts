@@ -38,7 +38,7 @@ export class Solver {
   }
 
   solve() {
-    console.info("Solving board: ");
+    console.info("\nSolving board: ");
     this.board.display();
 
     while (!(this.stuck || this.solved)) {
@@ -80,7 +80,8 @@ export class Solver {
             .join("|")
         )
         .join("\n---+---+---+---+---+---+---+---+---\n"),
-      ...styles
+      ...styles,
+      "\n"
     );
   }
 
