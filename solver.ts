@@ -1,12 +1,13 @@
 import { Board } from "./board.ts";
-import { Grid, Row, Value } from "./types.ts";
+import { Cell, Grid, Row, Value } from "./types.ts";
 
 type SolverCell = {
-  value: Value | undefined;
+  value: Cell;
+  initialValue: boolean;
   options: Value[];
 };
 
-const OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+const OPTIONS: Value[] = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 
 export class Solver {
   grid: Grid<SolverCell>;
@@ -16,8 +17,8 @@ export class Solver {
   step = 0;
   foundValues = 0;
 
-  constructor(g: Board) {
-    this.board = g;
+  constructor(board: Board) {
+    this.board = board;
     this.grid = this.board.grid.map(
       (row) =>
         row.map((cell) => {
@@ -25,10 +26,13 @@ export class Solver {
             this.foundValues++;
           }
 
-          return {
+          const solverCell: SolverCell = {
             value: cell,
+            initialValue: Boolean(cell),
             options: cell ? [cell] : OPTIONS,
-          } as SolverCell;
+          };
+
+          return solverCell;
         }) as Row<SolverCell>
     ) as Grid<SolverCell>;
   }
@@ -39,13 +43,45 @@ export class Solver {
 
     while (!(this.stuck || this.solved)) {
       this.step++;
-      this.solveEasy();
+      try {
+        this.solveEasy();
+      } catch (e) {
+        console.error(`Error: Failed to solve this grid at step ${this.step}.`);
+
+        console.error(e);
+        this.board.display();
+        return;
+      }
     }
 
     console.info(
-      `${this.solved ? "Solved" : "Stuck"} after ${this.step} steps !`
+      `\n${this.solved ? "Solved" : "Stuck"} after ${this.step} steps !`
     );
-    this.board.display();
+    this.display();
+  }
+
+  display() {
+    const styles: string[] = [];
+    console.info(
+      this.grid
+        .map((row) =>
+          row
+            .map((cell) => {
+              if (!cell.value) {
+                return "   ";
+              }
+              if (cell.initialValue) {
+                return ` ${cell.value} `;
+              }
+
+              styles.push("color: green;", "color: white;");
+              return ` %c${cell.value}%c `;
+            })
+            .join("|")
+        )
+        .join("\n---+---+---+---+---+---+---+---+---\n"),
+      ...styles
+    );
   }
 
   private solveEasy = () => {
@@ -58,30 +94,11 @@ export class Solver {
         if (!this.grid[I][J].value) {
           const existingValues = new Set();
           // Check for column
-          for (let i = 0; i < 9; i++) {
-            const value = this.grid[i][J].value;
-            if (value) {
-              existingValues.add(value);
-            }
-          }
+          this.getValuesInCol(J).forEach((v) => existingValues.add(v));
           // Check for row
-          for (let j = 0; j < 9; j++) {
-            const value = this.grid[I][j].value;
-            if (value) {
-              existingValues.add(value);
-            }
-          }
+          this.getValuesInRow(I).forEach((v) => existingValues.add(v));
           // Check for square
-          const iStart = I - (I % 3);
-          const jStart = J - (J % 3);
-          for (let i = iStart; i < iStart + 3; i++) {
-            for (let j = jStart; j < jStart + 3; j++) {
-              const value = this.grid[i][j].value;
-              if (value) {
-                existingValues.add(value);
-              }
-            }
-          }
+          this.getValuesInSquare(I, J).forEach((v) => existingValues.add(v));
 
           // Remove existing values from options
           this.grid[I][J].options = this.grid[I][J].options.filter(
@@ -102,4 +119,61 @@ export class Solver {
       }
     }
   };
+
+  private getValuesInCol(J: number): Value[] {
+    const values: Value[] = [];
+    for (let i = 0; i < 9; i++) {
+      const value = this.grid[i][J].value;
+      if (value) {
+        values.push(value);
+      }
+    }
+    if (values.length !== new Set(values).size) {
+      throw new Error(
+        `Wrong board, encountered twice the same number in col ${J}. (${values})`
+      );
+    }
+
+    return values;
+  }
+
+  private getValuesInRow(I: number): Value[] {
+    const values: Value[] = [];
+    for (let j = 0; j < 9; j++) {
+      const value = this.grid[I][j].value;
+      if (value) {
+        values.push(value);
+      }
+    }
+    if (values.length !== new Set(values).size) {
+      throw new Error(
+        `Wrong board, encountered twice the same number in row ${I}. (${values})`
+      );
+    }
+
+    return values;
+  }
+
+  private getValuesInSquare(I: number, J: number): Value[] {
+    const values: Value[] = [];
+    const iStart = I - (I % 3);
+    const jStart = J - (J % 3);
+    for (let i = iStart; i < iStart + 3; i++) {
+      for (let j = jStart; j < jStart + 3; j++) {
+        const value = this.grid[i][j].value;
+        if (value) {
+          values.push(value);
+        }
+      }
+    }
+    if (values.length !== new Set(values).size) {
+      throw new Error(
+        `Wrong board, encountered twice the same number in square (${
+          iStart / 3
+        }, ${jStart / 3}). (${values})`
+      );
+    }
+
+    return values;
+  }
 }
